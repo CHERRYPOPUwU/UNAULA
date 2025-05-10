@@ -1,0 +1,70 @@
+services:
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - '3000:3000'
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - NODE_ENV=development
+    depends_on:
+      - db
+    networks:
+      - backend
+  db:
+    image: postgres:15.2-alpine3.17
+    restart: always
+    environment: 
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./backend/test/resources/db/init.sql:/docker-entrypoint-initdb.d/create_tables.sql
+      - ./backend/test/resources/db/insert_data.sql:/docker-entrypoint-initdb.d/insert_data.sql
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend 
+  admin-db:
+    image: dpage/pgadmin4
+    depends_on:
+      - db
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - '8888:80'
+    networks:
+      - backend
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    restart: always
+    command: npm run dev -- --host 0.0.0.0
+
+networks:
+  backend:
+volumes:
+  postgres_data:
